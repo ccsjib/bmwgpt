@@ -21,7 +21,7 @@ from google.api_core.exceptions import ResourceExhausted
 # --- CONFIGURATION ---
 MODEL_PATH = "bmw_model_b4_noncar.pth"
 CLASS_JSON_PATH = "bmw_class_map_b4.json"
-DB_PATH = "./bmw_knowledge_db_rag"
+DB_PATH = "./bmw_knowledge_db_rag_easyocr"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # --- PAGE SETUP & THEME ---
