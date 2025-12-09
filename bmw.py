@@ -25,7 +25,7 @@ DB_PATH = "./bmw_knowledge_db_rag_easyocr"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # --- PAGE SETUP & THEME ---
-st.set_page_config(page_title="BMWGPT", layout="wide", page_icon="static/BMW_favicon.png")
+st.set_page_config(page_title="BMWCHAT", layout="wide", page_icon="static/BMW_favicon.png")
 
 st.markdown("""
     <style>
@@ -97,7 +97,7 @@ with img_col:
 with title_col:
     # Put the title in the second new column
     #st.write("##") # Workaround for vertical alignment
-    st.title("BMWGPT")
+    st.title("BMWCHAT")
 
 st.markdown("Upload a photo of a BMW. I will identify it and answer technical questions.")
 
