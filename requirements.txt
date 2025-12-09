@@ -5,6 +5,7 @@ torchvision
 ipykernel
 openai
 transformers
+sentence-transformers
 Pillow
 tqdm
 kagglehub
