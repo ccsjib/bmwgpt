@@ -197,7 +197,7 @@ def format_class_name(raw_name):
 def ask_gemini_with_cache(car_model, user_question, context_text, api_key):
     # Setup
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-2.5-flash-lite",
         temperature=0,
         google_api_key=api_key,
         convert_system_message_to_human=True,
@@ -367,20 +367,24 @@ with st.sidebar:
     st.markdown(
         """
         To enable the **Gemini API** for final answer generation, 
-        you must enter a valid Google API Key.
-        
-        **Follow these steps:**
-        1. Navigate to **Google AI Studio** (aistudio.google.com).
-        2. Log in with your Google account and select **'Get API key'**.
-        3. Click on **'Create API Key'** to generate a new key.
-        4. Name your key and select the default project.
-        5. Click the randomly generated string to reveal your API key.
-        6. CLick the **Copy key** button.
-        7. Paste the key into the input box above.
-        
-        Note: Cars can still be identified without the key, but the technical assistant will be disabled.
+        you must enter a valid Google API Key. 
+        """
+        )
+
+    st.link_button("Navigate to **Google AI Studio**", "https://www.aistudio.google.com/")    
+
+    st.markdown("""**Click the button above and follow these steps:**""")
+    st.markdown(
+        """
+        1. Log in with your Google account and select **'Get API key'**.
+        2. Click on **'Create API Key'** to generate a new key.
+        3. Name your key and select the default project.
+        4. Click the randomly generated string to reveal your API key.
+        5. CLick the **Copy key** button.
+        6. Paste the key into the input box above.
         """
     )
+    st.markdown("""Note: Cars can still be identified without the key, but the technical assistant will be disabled.""")
 
 
 try:
