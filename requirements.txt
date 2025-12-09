@@ -5,7 +5,7 @@ torchvision
 ipykernel
 openai
 transformers
-pillow
+Pillow
 tqdm
 kagglehub
 ddgs
@@ -16,5 +16,8 @@ easyocr
 pdf2image
 langchain-chroma
 langchain-huggingface
+langchain-google-genai
 beautifulsoup4
 google-genai
+pydantic
+streamlit
