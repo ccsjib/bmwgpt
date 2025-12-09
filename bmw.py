@@ -469,7 +469,7 @@ def handle_override_change():
 
 
 with col1:
-    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+    uploaded_file = st.file_uploader("Upload a picture of a BMW here!", type=["jpg", "png", "jpeg"])
     
     if uploaded_file is not None:
         image_bytes = uploaded_file.getvalue()
