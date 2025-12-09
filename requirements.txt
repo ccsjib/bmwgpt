@@ -19,5 +19,6 @@ langchain-huggingface
 langchain-google-genai
 beautifulsoup4
 google-genai
+google-api-core
 pydantic
 streamlit
