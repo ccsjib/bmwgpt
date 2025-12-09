@@ -396,7 +396,7 @@ with st.sidebar:
 try:
     vision_model, class_names, idx_to_class = load_vision_model()
     rag_db = load_rag_system()
-    custom_success("Systems Online: Vision Model & RAG Database Connected")
+    custom_success("BMW Identification Model & Info Database Connected")
 except FileNotFoundError as e:
     st.error(f"❌ Missing File: {e}")
     st.stop()
