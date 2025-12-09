@@ -13,6 +13,8 @@ import hashlib
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
+from google import genai
+from google.genai.errors import APIError
 from langchain_core.prompts import ChatPromptTemplate
 from google.api_core.exceptions import ResourceExhausted
 
@@ -42,13 +44,13 @@ st.markdown("""
             color: #009ADA !important;
         }
 
-        /* 2. Sidebar - WHITE Background, BLACK Text */
+        /* 2. Sidebar - black Background, white Text */
         section[data-testid="stSidebar"] {
-            background-color: #FFFFFF;
+            background-color: #0f1117;
         }
-        /* Force all text inside sidebar to be black */
+        /* Force all text inside sidebar to be white */
         section[data-testid="stSidebar"] * {
-            color: #000000 !important;
+            color: #FFFFFF !important;
         }
         
         /* 3. Button Styling (Accent Color) */
@@ -297,26 +299,88 @@ def generate_answer(car_model, user_question, db, api_key, chassis_override=None
     answer_content = ask_gemini_with_cache(car_model, full_prompt_question, context_text, api_key)
     
     return answer_content, docs
+# ... (rest of imports and definitions) ...
+
+# --- API KEY VALIDATION (NO CACHE) ---
+def validate_gemini_api_key(api_key: str) -> bool:
+    if not api_key:
+        return False
+
+    try:
+        # Initialize the client by passing the key. 
+        client = genai.Client(api_key=api_key)
+        # Attempt a simple, cheap operation: listing the models.
+        list(client.models.list())
+        return True
+    
+    except APIError as e:
+        return False
+    except Exception as e:
+        return False
+
+# Function to run when key is entered/changed
+def check_and_store_key():
+    user_api_key = st.session_state['user_api_key_input']
+    was_valid_before = st.session_state['is_key_valid']
+    
+    is_valid_now = validate_gemini_api_key(user_api_key)
+    st.session_state['is_key_valid'] = is_valid_now
+
+    if is_valid_now:
+        st.session_state['gemini_api_key'] = user_api_key
+        # FIX: Clear cache if the key status just changed from invalid/blank to valid
+        if not was_valid_before:
+             st.cache_data.clear()
+    else:
+        st.session_state['gemini_api_key'] = ''
+
 
 # --- MAIN UI ---
+# Initialize session state if not present (good Streamlit practice)
+if 'gemini_api_key' not in st.session_state:
+    st.session_state['gemini_api_key'] = ''
+if 'is_key_valid' not in st.session_state:
+    st.session_state['is_key_valid'] = False 
+
+
 with st.sidebar:
     st.header("Configuration")
     
-    # --- SECRETS MANAGEMENT ---
-    if "GOOGLE_API_KEY" in st.secrets:
-        api_key = st.secrets["GOOGLE_API_KEY"]
-        st.success("✅ API Key Connected")
+    # Let user input the key manually
+    st.text_input(
+        "Enter your Google API Key (from Google AI Studio)",
+        value=st.session_state['gemini_api_key'], # Pre-fill if already connected
+        type="password",  # hides the key while typing
+        placeholder="Paste your API key here",
+        key='user_api_key_input', # Unique key for the widget
+        on_change=check_and_store_key # Run validation on change
+    )
+    
+    # This logic now relies ENTIRELY on the check_and_store_key function
+    if st.session_state['is_key_valid']:
+        st.success("✅ API Key Connected manually")
     else:
-        st.error("❌ Missing Secrets File")
-        st.info("Please create .streamlit/secrets.toml")
-        api_key = None
+        st.info("API Key not found or invalid. Please enter a valid key.")
 
     st.divider()
-    st.markdown("BMWGPT")
-    st.markdown("Based on EfficientNet-B4 trained on a custom dataset of 10k+ images.")
-    st.markdown("RAG system built with LangChain and ChromaDB using HuggingFace Embeddings")
-    st.markdown("RAG data sourced from BMW repair manuals, forums, and Wikipedia.")
-    st.markdown("Humanized and general info backup by Google Gemini 2.5")
+    st.markdown("### 🔑 Get Your Gemini API Key")
+    st.markdown(
+        """
+        To enable the **Gemini API** for final answer generation, 
+        you must enter a valid Google API Key.
+        
+        **Follow these steps:**
+        1. Navigate to **Google AI Studio** (aistudio.google.com).
+        2. Log in with your Google account and select **'Get API key'**.
+        3. Click on **'Create API Key'** to generate a new key.
+        4. Name your key and select the default project.
+        5. Click the randomly generated string to reveal your API key.
+        6. CLick the **Copy key** button.
+        7. Paste the key into the input box above.
+        
+        Note: Cars can still be identified without the key, but the technical assistant will be disabled.
+        """
+    )
 
 
 try:
@@ -488,13 +552,11 @@ with col2:
         st.divider()
         st.markdown(f"**Not a {car_display}?** Correct the model here:")
         
-        # Determine the correct starting index for the selectbox
-        # Use the current display name to find the index
         current_display_name = st.session_state.get('current_car_display', 'Model Correct - Proceed')
         try:
             initial_index = CHASSIS_OVERRIDE_LIST.index(current_display_name)
         except ValueError:
-            initial_index = 0 # Fallback to 'Model Correct - Proceed'
+            initial_index = 0
             
         selected_chassis = st.selectbox(
             label="Correct Model Selection",
@@ -518,19 +580,26 @@ with col2:
             else:
                 st.success(f"✅ **Active Analysis Mode:** {car_display}")
             
-            query = st.text_input(f"Ask a technical question about this {car_display}:")
+            # ------------------------------------------------------------------
+            # CRITICAL FIX: Only enable the chat box if the API key is valid.
+            # ------------------------------------------------------------------
             
-            if query:
-                if not api_key:
-                    st.warning("⚠️ API Key not found. Please check .streamlit/secrets.toml")
-                else:
+            if not st.session_state['is_key_valid']:
+                st.warning("⚠️ Please enter a valid Google API Key in the sidebar to enable the technical assistant.")
+                # We do NOT render st.text_input if the key is invalid
+            else:
+                # Only show the chat box if we know the key is good
+                query = st.text_input(f"Ask a technical question about this {car_display}:")
+                
+                if query:
+                    # The API key is guaranteed to be valid here
                     with st.spinner(f"Consulting manuals for {car_display}..."):
-                        # Pass the chassis_code override to generate_answer
+                        # Pass the API key from session state
                         answer, sources = generate_answer(
                             car_display, 
                             query, 
                             rag_db, 
-                            api_key,
+                            st.session_state['gemini_api_key'], 
                             chassis_override=current_chassis
                         )
                     
