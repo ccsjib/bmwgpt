@@ -529,7 +529,7 @@ with col2:
     
     if st.session_state['app_state'] == 'invalid':
         display_name = st.session_state['current_car_display']
-        st.error(f"⛔ **HALT:** This image is identified as **{display_name}**.")
+        st.error(f"⛔ This image is identified as **{display_name}**.")
         st.write("Please upload a valid BMW vehicle image to access the repair assistant.")
         
         # --- MANUAL OVERRIDE SECTION FOR INVALID IMAGES ---
