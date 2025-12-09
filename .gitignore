@@ -1,0 +1,9 @@
+ddg_custom_bmw_dataset/
+bmw_rag_data/**
+.streamlit/
+*.zip
+.venv/
+.DS_Store
+*.pt
+*.pth
+bmw_rag_data.zip

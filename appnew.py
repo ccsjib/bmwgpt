@@ -1,0 +1,548 @@
+import streamlit as st
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torchvision import models, transforms
+from PIL import Image
+import json
+import os
+import time
+import hashlib
+
+# --- LANGCHAIN & GEMINI IMPORTS ---
+from langchain_chroma import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.prompts import ChatPromptTemplate
+from google.api_core.exceptions import ResourceExhausted
+
+# --- CONFIGURATION ---
+MODEL_PATH = "bmw_model_b4_noncaryay.pth"
+CLASS_JSON_PATH = "bmw_class_map_b4.json"
+DB_PATH = "./bmw_knowledge_db_rag"
+EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+
+# --- PAGE SETUP & THEME ---
+st.set_page_config(page_title="BMWGPT", layout="wide", page_icon="static/BMW_favicon.png")
+
+st.markdown("""
+    <style>
+        /* 1. Main Content Area - BLACK Background, WHITE Text */
+        .stApp {
+            background-color: #0f1117;
+            color: #FFFFFF;
+        }
+        
+        /* Headers in Main Area - White */
+        h1, h2, h3, h4, h5, h6, .stMarkdown, p {
+            color: #FFFFFF !important;
+        }
+        /* Except the Main Title which gets the Accent */
+        h1 {
+            color: #009ADA !important;
+        }
+
+        /* 2. Sidebar - WHITE Background, BLACK Text */
+        section[data-testid="stSidebar"] {
+            background-color: #FFFFFF;
+        }
+        /* Force all text inside sidebar to be black */
+        section[data-testid="stSidebar"] * {
+            color: #000000 !important;
+        }
+        
+        /* 3. Button Styling (Accent Color) */
+        .stButton>button {
+            background-color: #009ADA; 
+            color: white;
+            border: none;
+        }
+        .stButton>button:hover {
+            background-color: #007bb5;
+            color: white;
+        }
+        
+        /* 4. Inputs (Text Input) Styling to match Dark Theme */
+        .stTextInput>div>div>input {
+            color: white;
+            background-color: #333333;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Helper function for Custom Success Box (#009ADA)
+def custom_success(msg):
+    st.markdown(f"""
+        <div style="
+            background-color: #009ADA;
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            font-weight: 500;
+        ">
+            ✅ {msg}
+        </div>
+    """, unsafe_allow_html=True)
+
+
+img_col, title_col = st.columns([1, 15]) # Adjust the ratio as needed
+
+with img_col:
+    # Put the image in the first new column
+    st.image("static/BMW_favicon.png", width=100)
+
+with title_col:
+    # Put the title in the second new column
+    #st.write("##") # Workaround for vertical alignment
+    st.title("BMWGPT")
+
+st.markdown("Upload a photo of a BMW. I will identify it and answer technical questions.")
+
+# --- STEP 1: LOAD THE VISION MODEL ---
+@st.cache_resource
+def load_vision_model():
+    with open(CLASS_JSON_PATH, 'r') as f:
+        class_map = json.load(f)
+        # Fix: Create an integer-keyed map for logic
+        idx_to_class = {int(k): v for k, v in class_map.items()}
+        classes = [idx_to_class[i] for i in range(len(idx_to_class))]
+    
+    model = models.efficientnet_b4(weights=None)
+    num_features = model.classifier[1].in_features 
+    model.classifier[1] = nn.Linear(num_features, len(classes))
+    
+    try:
+        model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
+    except RuntimeError as e:
+        st.error(f"Architecture Mismatch: {e}")
+        st.stop()
+        
+    model.eval()
+    return model, classes, idx_to_class
+
+# --- STEP 2: LOAD THE RAG BRAIN ---
+@st.cache_resource
+def load_rag_system():
+    embedding_func = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    db = Chroma(persist_directory=DB_PATH, embedding_function=embedding_func)
+    return db
+
+# --- STEP 3: PIPELINE FUNCTIONS (ROBUST LOGIC) ---
+def robust_process_image(image, model, classes, idx_to_class):
+    # 1. Vision Transforms (EfficientNet B4 Native)
+    transform = transforms.Compose([
+        transforms.Resize(380),
+        transforms.CenterCrop(380),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    ])
+    
+    img_t = transform(image).unsqueeze(0)
+    
+    with torch.no_grad():
+        outputs = model(img_t)
+        probs = F.softmax(outputs, dim=1)[0]
+    
+    # 2. Logic: Sum Probabilities (The Ferrari & 26% Fix)
+    bmw_indices = [idx for idx, name in idx_to_class.items() if "non" not in name.lower()]
+    non_bmw_indices = [idx for idx, name in idx_to_class.items() if "non" in name.lower()]
+            
+    bmw_total_score = sum(probs[i].item() for i in bmw_indices)
+    non_bmw_total_score = sum(probs[i].item() for i in non_bmw_indices)
+    
+    # 3. Find Specific Model Leaders
+    top_probs, top_indices = torch.topk(probs, 3)
+    chart_data = []
+    for i in range(3):
+        idx = top_indices[i].item()
+        score = top_probs[i].item() * 100
+        name = classes[idx]
+        chart_data.append((name, score))
+
+    best_bmw_idx = max(bmw_indices, key=lambda i: probs[i].item())
+    best_bmw_prob = probs[best_bmw_idx].item()
+            
+    best_non_idx = max(non_bmw_indices, key=lambda i: probs[i].item()) if non_bmw_indices else None
+
+    # 4. Return Structured Decision
+    if non_bmw_total_score > bmw_total_score:
+        return {
+            "is_valid": False,
+            "display_name": classes[best_non_idx] if best_non_idx is not None else "Unknown Non-BMW",
+            "raw_score": best_bmw_prob * 100,
+            "category_score": non_bmw_total_score * 100,
+            "chart_data": chart_data
+        }
+    else:
+        return {
+            "is_valid": True,
+            "display_name": classes[best_bmw_idx],
+            "raw_score": best_bmw_prob * 100,
+            "category_score": bmw_total_score * 100,
+            "chart_data": chart_data
+        }
+
+def format_class_name(raw_name):
+    if raw_name == "non_bmw_cars":
+        return "Non-BMW Car"
+    if raw_name == "non_cars":
+        return "Not a Vehicle"
+    return raw_name.replace("_", " ")
+
+# --- CACHED GEMINI FUNCTION ---
+@st.cache_data(show_spinner=False, ttl=3600) 
+def ask_gemini_with_cache(car_model, user_question, context_text, api_key):
+    # Setup
+    llm = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        temperature=0,
+        google_api_key=api_key,
+        convert_system_message_to_human=True,
+        max_retries=1
+    )
+    
+    prompt = ChatPromptTemplate.from_template("""
+    You are a BMW mechanic information assistant.
+    
+    Context from Expert Guides/Forums:
+    {context}
+    
+    The user has identified their car as a: {car_model}
+    User Question: {question}
+    
+    Instructions:
+    1. Answer the question based strictly on the context provided.
+    2. If the user's car is NOT in the context, strictly state: "I couldn't find detailed repair manuals for this specific model in my database, but here is general information based on standard automotive knowledge:" and then provide a helpful answer based on general knowledge.
+    """)
+    
+    chain = prompt | llm
+    
+    # Retry Logic with Backoff
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            response = chain.invoke({
+                "context": context_text, 
+                "car_model": car_model, 
+                "question": user_question
+            })
+            return response.content
+        except ResourceExhausted:
+            wait_time = (attempt + 1) * 5 
+            time.sleep(wait_time)
+            continue
+        except Exception as e:
+            return f"⚠️ **AI Error:** {str(e)}"
+    
+    return "⚠️ **Traffic Limit Reached:** The AI is currently overwhelmed (Quota Limit). Please wait 60 seconds and try again."
+
+def extract_chassis_code(raw_name):
+    # Helper to ensure we get "E36" from "BMW E36" or "E36 Convertible"
+    known_codes = [
+        "E24", "E28", "E30", "E31", "E32", "E34",
+        "E36", "E38", "E39", "E46", "E52", "E53", "E83",
+        "Z1", "Z3", "Z8", "X5"
+    ]
+    raw_name = raw_name.upper()
+    for code in known_codes:
+        if code in raw_name:
+            return code
+    return None
+
+def generate_answer(car_model, user_question, db, api_key, chassis_override=None):
+    # 1. Determine which chassis code to use
+    if chassis_override:
+        chassis_code = chassis_override
+    else:
+        chassis_code = extract_chassis_code(car_model)
+    
+    docs = []
+    used_strategy = "Specific"
+
+    try:
+        if chassis_code and chassis_code != "General":
+            # STRATEGY A: Hard Filter (Strict Mode)
+            docs = db.similarity_search(
+                user_question, 
+                k=4, 
+                filter={"car_model": chassis_code}
+            )
+        
+        # STRATEGY B: Fallback to General/No-Filter if Specific fails
+        if not docs:
+            used_strategy = "General Fallback"
+            docs = db.similarity_search(
+                user_question,
+                k=4,
+                filter={"car_model": "General"}
+            )
+            
+            # If still nothing, do a global search
+            if not docs:
+                 used_strategy = "Global (Last Resort)"
+                 docs = db.similarity_search(f"{car_model} {user_question}", k=4)
+
+    except Exception as e:
+        return f"⚠️ **Database Error:** {str(e)}", []
+    
+    # Context Construction
+    if not docs:
+        return "⚠️ I couldn't find any relevant manual pages for this specific issue.", []
+
+    context_text = "\n\n".join([f"[Source: {d.metadata.get('car_model', 'Unknown')}] {d.page_content}" for d in docs])
+    full_prompt_question = f"User Question: {user_question}\n(Search Strategy Used: {used_strategy})"
+    
+    answer_content = ask_gemini_with_cache(car_model, full_prompt_question, context_text, api_key)
+    
+    return answer_content, docs
+
+# --- MAIN UI ---
+with st.sidebar:
+    st.header("Configuration")
+    
+    # --- SECRETS MANAGEMENT ---
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        st.success("✅ API Key Connected")
+    else:
+        st.error("❌ Missing Secrets File")
+        st.info("Please create .streamlit/secrets.toml")
+        api_key = None
+
+    st.divider()
+    st.markdown("BMWGPT")
+    st.markdown("Based on EfficientNet-B4 trained on a custom dataset of 10k+ images.")
+    st.markdown("RAG system built with LangChain and ChromaDB using HuggingFace Embeddings")
+    st.markdown("RAG data sourced from BMW repair manuals, forums, and Wikipedia.")
+    st.markdown("Humanized and general info backup by Google Gemini 2.5")
+
+
+try:
+    vision_model, class_names, idx_to_class = load_vision_model()
+    rag_db = load_rag_system()
+    custom_success("Systems Online: Vision Model & RAG Database Connected")
+except FileNotFoundError as e:
+    st.error(f"❌ Missing File: {e}")
+    st.stop()
+
+# --- GENERATE CHASSIS OVERRIDE LIST ---
+# 1. Get all unique model names that are NOT non-car/non-BMW
+unique_model_names = sorted(list(set(format_class_name(c) for c in class_names if 'non' not in c.lower())))
+
+# 2. Insert utility options at the top
+unique_model_names.insert(0, "Model Correct - Proceed") 
+unique_model_names.insert(2, "Non-BMW/Incorrect Image")
+
+CHASSIS_OVERRIDE_LIST = unique_model_names
+col1, col2 = st.columns([1, 2])
+
+# Define Scope Lists (Used for the UI only)
+SUPPORTED_MODELS = [
+    "E30", "E36", "E46", 
+    "E28", "E34", "E39", 
+    "E24", 
+    "E23", "E32", "E38", 
+    "E31", 
+    "Z3", "Z8", 
+    "E53"
+]
+
+# Initialize Session State
+if 'app_state' not in st.session_state: st.session_state['app_state'] = 'idle'
+if 'current_car_raw' not in st.session_state: st.session_state['current_car_raw'] = None
+if 'current_car_display' not in st.session_state: st.session_state['current_car_display'] = None
+if 'chassis_code' not in st.session_state: st.session_state['chassis_code'] = None
+if 'prediction_hash' not in st.session_state: st.session_state['prediction_hash'] = None
+if 'is_override_active' not in st.session_state: st.session_state['is_override_active'] = False
+if 'initial_chassis_code' not in st.session_state: st.session_state['initial_chassis_code'] = None
+if 'initial_car_display' not in st.session_state: st.session_state['initial_car_display'] = None
+
+
+def handle_override_change():
+    """Callback function to handle the user selecting a new car."""
+    selected_option = st.session_state['override_selection']
+    
+    # 1. Flag override as active
+    st.session_state['is_override_active'] = True
+
+    if selected_option == "Model Correct - Proceed":
+        # Restore original state from when the image was uploaded
+        st.session_state['chassis_code'] = st.session_state['initial_chassis_code']
+        st.session_state['current_car_display'] = st.session_state['initial_car_display']
+        st.session_state['app_state'] = 'valid'
+        st.session_state['is_override_active'] = False # Deactivate override flag
+        return
+        
+    elif selected_option == "Non-BMW/Incorrect Image":
+        st.session_state['app_state'] = 'invalid'
+        st.session_state['current_car_display'] = "Incorrect Image"
+        st.session_state['chassis_code'] = None
+        return
+
+        
+    else:
+        # User selected a specific model name (e.g., 'BMW E36 Coupe').
+        # We must extract the chassis code from this string for RAG filtering.
+        new_chassis_code = extract_chassis_code(selected_option)
+        
+        st.session_state['chassis_code'] = new_chassis_code
+        st.session_state['current_car_display'] = selected_option # Set full name for display
+        st.session_state['app_state'] = 'valid'
+        st.toast(f"✅ Analysis set to {selected_option}!")
+        return
+
+
+with col1:
+    uploaded_file = st.file_uploader("Upload Image", type=["jpg", "png", "jpeg"])
+    
+    if uploaded_file is not None:
+        image_bytes = uploaded_file.getvalue()
+        current_hash = hashlib.sha256(image_bytes).hexdigest()
+        image = Image.open(uploaded_file).convert('RGB')
+
+        # --- PREDICTION LOGIC PROTECTION ---
+        if current_hash != st.session_state['prediction_hash'] or not st.session_state['is_override_active']:
+            
+            # --- RESET OVERRIDE STATE ---
+            st.session_state['is_override_active'] = False
+            
+            # --- RUN MODEL ---
+            result = robust_process_image(image, vision_model, class_names, idx_to_class)
+            
+            # --- STORE INITIAL PREDICTION STATE ---
+            top_car_raw = result['display_name']
+            top_car_display = format_class_name(top_car_raw)
+            original_chassis = extract_chassis_code(top_car_raw)
+            
+            st.session_state['initial_chassis_code'] = original_chassis
+            st.session_state['initial_car_display'] = top_car_display
+            st.session_state['prediction_hash'] = current_hash
+            
+            # --- SET CURRENT STATE FROM MODEL'S GUESS ---
+            st.session_state['current_car_raw'] = top_car_raw
+            st.session_state['current_car_display'] = top_car_display
+            st.session_state['chassis_code'] = original_chassis
+            
+            # --- UI VISUALS & WARNINGS ---
+            category_score = result['category_score']
+            is_supported = any(code in top_car_raw for code in SUPPORTED_MODELS)
+            
+            st.caption("Confidence Breakdown:")
+            chart_dict = {format_class_name(p[0]): p[1] for p in result['chart_data']}
+            st.bar_chart(chart_dict)
+            
+            if not result['is_valid']:
+                st.session_state['app_state'] = 'invalid'
+            else:
+                st.session_state['app_state'] = 'valid'
+
+                if category_score < 40:
+                     st.warning(f"⚠️ Low Confidence. It looks like a **{top_car_display}**, but overall certainty is only {category_score:.1f}%.")
+                elif result['raw_score'] < 30:
+                     st.info(f"ℹ️ **Ambiguous Model:** Confidence is high ({category_score:.1f}%) that this is a BMW, but the exact model is unclear. Best match: **{top_car_display}**.")
+    
+                if is_supported:
+                    custom_success(f"**Verified:** Detected **{top_car_display}**. Detailed repair manuals are loaded.")
+                else:
+                    st.warning(f"⚠️ **General Mode:** Detected **{top_car_display}**. This model is outside our specialized database (1980-2006). Using general Wikipedia/Web knowledge.")
+
+        # Display the current image regardless of whether processing was skipped
+        st.image(image, caption='Your Upload', use_container_width=True)
+
+with col2:
+    
+    if st.session_state['app_state'] == 'invalid':
+        display_name = st.session_state['current_car_display']
+        st.error(f"⛔ **HALT:** This image is identified as **{display_name}**.")
+        st.write("Please upload a valid BMW vehicle image to access the repair assistant.")
+        
+        # --- MANUAL OVERRIDE SECTION FOR INVALID IMAGES ---
+        st.divider()
+        st.markdown("**Actually a BMW?** Correct the model here:")
+        
+        initial_index = 2 # Default to "Non-BMW/Incorrect Image"
+        
+        # Find the correct index if the error message is the same as a utility option
+        try:
+             initial_index = CHASSIS_OVERRIDE_LIST.index(display_name)
+        except ValueError:
+             pass
+
+        selected_chassis = st.selectbox(
+            label="Correct Model Selection",
+            options=CHASSIS_OVERRIDE_LIST,
+            key='override_selection',
+            index=initial_index, 
+            on_change=handle_override_change
+        )
+        st.divider()
+        st.caption("Select a BMW model above if the detection was incorrect.")
+        # --- END MANUAL OVERRIDE SECTION ---
+    
+    elif st.session_state['app_state'] == 'valid':
+        car_display = st.session_state['current_car_display']
+        
+        # --- MANUAL OVERRIDE SECTION ---
+        st.divider()
+        st.markdown(f"**Not a {car_display}?** Correct the model here:")
+        
+        # Determine the correct starting index for the selectbox
+        # Use the current display name to find the index
+        current_display_name = st.session_state.get('current_car_display', 'Model Correct - Proceed')
+        try:
+            initial_index = CHASSIS_OVERRIDE_LIST.index(current_display_name)
+        except ValueError:
+            initial_index = 0 # Fallback to 'Model Correct - Proceed'
+            
+        selected_chassis = st.selectbox(
+            label="Correct Model Selection",
+            options=CHASSIS_OVERRIDE_LIST,
+            key='override_selection',
+            index=initial_index, 
+            on_change=handle_override_change
+        )
+        st.divider()
+        # --- END MANUAL OVERRIDE SECTION ---
+        
+        
+        # Final check if the state is still valid after the override callback
+        if st.session_state['app_state'] == 'valid':
+            car_display = st.session_state['current_car_display']
+            current_chassis = st.session_state.get('chassis_code')
+            
+            # Show active analysis mode
+            if current_chassis:
+                st.success(f"✅ **Active Analysis Mode:** {car_display} (Code: {current_chassis})")
+            else:
+                st.success(f"✅ **Active Analysis Mode:** {car_display}")
+            
+            query = st.text_input(f"Ask a technical question about this {car_display}:")
+            
+            if query:
+                if not api_key:
+                    st.warning("⚠️ API Key not found. Please check .streamlit/secrets.toml")
+                else:
+                    with st.spinner(f"Consulting manuals for {car_display}..."):
+                        # Pass the chassis_code override to generate_answer
+                        answer, sources = generate_answer(
+                            car_display, 
+                            query, 
+                            rag_db, 
+                            api_key,
+                            chassis_override=current_chassis
+                        )
+                    
+                    st.markdown(answer)
+                    
+                    if sources: 
+                        with st.expander("View Source Documents (Evidence)"):
+                            for i, doc in enumerate(sources):
+                                source_type = doc.metadata.get('source_type', 'Unknown').upper()
+                                car_model_meta = doc.metadata.get('car_model', 'Unknown')
+                                st.markdown(f"**Reference {i+1} [{source_type} - {car_model_meta}]:**")
+                                st.caption(doc.page_content[:400] + "...")
+                        
+    else:
+        st.info("👋 Waiting for image upload...")
