@@ -351,7 +351,7 @@ with st.sidebar:
         "Enter your Google API Key (from Google AI Studio)",
         value=st.session_state['gemini_api_key'], # Pre-fill if already connected
         type="password",  # hides the key while typing
-        placeholder="Paste your API key here",
+        placeholder="Paste API key here",
         key='user_api_key_input', # Unique key for the widget
         on_change=check_and_store_key # Run validation on change
     )
