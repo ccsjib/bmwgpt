@@ -371,7 +371,7 @@ with st.sidebar:
         """
         )
 
-    st.link_button("Navigate to **Google AI Studio**", "https://www.aistudio.google.com/")    
+    st.link_button("**Google AI Studio**", "https://www.aistudio.google.com/")    
 
     st.markdown("""**Click the button above and follow these steps:**""")
     st.markdown(
