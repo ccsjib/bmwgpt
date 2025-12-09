@@ -4,6 +4,4 @@ bmw_rag_data/**
 *.zip
 .venv/
 .DS_Store
-*.pt
-*.pth
 bmw_rag_data.zip
