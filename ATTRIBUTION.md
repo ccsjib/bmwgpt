@@ -17,8 +17,14 @@
 
 * CLIP
 * EfficientNet-B4
-* all-MiniLM-L6-v2 (sentence-transformers)
 
-## Hosted Using
+## Core Applications
+* [Streamlit](https://streamlit.io/)
+* [PyTorch](https://pytorch.org/)
+* [Torchvision](https://pytorch.org/vision/stable/index.html)
 
-* [Streamlit](https://streamlit.io)
+## RAG & Data Processing
+* [LangChain](https://www.langchain.com/)
+* [ChromaDB](https://www.trychroma.com/)
+* [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)
+* [HuggingFace Transformers](https://huggingface.co/) (`all-MiniLM-L6-v2`)
