@@ -22,6 +22,8 @@ Simply visit the BMWChat website here: [BMWChat](https://bmwchat.streamlit.app)
 
 ### Option 2: Run Locally
 
+*Required: Git
+
 Clone this repository and setup a Python virtual environment where you can download all required libraries in requirements.txt. Next, run ```streamlit run bmw.py``` in your terminal to locally host BMWChat. 
 
 ### API Key
@@ -37,6 +39,8 @@ Technical walkthrough here:
 The identification model had noticiable improvement in testing when switching from ResNet-18 to EfficientNet-B4 due to the higher resolution processing and a newer, more efficient model. 
 
 The database had much higher performance using EasyOCR as compared to Tesseract. Large amounts of evidence pulled from the database using Tesseract included mispelled words, keeping Gemini from accurately creating a response. 
+
+Average database response time of 4.2 seconds based on real-world trials on the web-hosted application. 
 
 ## Individual Contributions
 

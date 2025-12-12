@@ -523,7 +523,7 @@ with col1:
                 if is_supported:
                     custom_success(f"**Verified:** Detected **{top_car_display}**. Detailed repair manuals are loaded.")
                 else:
-                    st.warning(f"⚠️ **General Mode:** Detected **{top_car_display}**. This model is outside our specialized database (1980-2006). Using general Wikipedia/Web knowledge.")
+                    st.warning(f"⚠️ **General Mode:** Detected **{top_car_display}**. This model is outside our specialized database (1980s-2000s). Database retrieval will be attempted, but answers may be incorrect. Using general Wikipedia/Web knowledge.")
 
         # Display the current image regardless of whether processing was skipped
         st.image(image, caption='Your Upload', use_container_width=True)
