@@ -20,10 +20,15 @@ from google.genai.errors import APIError
 from langchain_core.prompts import ChatPromptTemplate
 from google.api_core.exceptions import ResourceExhausted
 
+
+
+current_folder = os.path.dirname(os.path.abspath(__file__))
+parent_folder = os.path.dirname(current_folder)
+
 # --- CONFIGURATION ---
-MODEL_PATH = "../models/bmw_model_b4_noncar.pth"
-CLASS_JSON_PATH = "../models/bmw_class_map_b4.json"
-DB_PATH = "../models/bmw_knowledge_db_rag_paddleocr"
+MODEL_PATH = f"{parent_folder}/models/bmw_model_b4_noncar.pth"
+CLASS_JSON_PATH = f"{parent_folder}/models/bmw_class_map_b4.json"
+DB_PATH = f"{parent_folder}/models/bmw_knowledge_db_rag_paddleocr"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # --- PAGE SETUP & THEME ---
