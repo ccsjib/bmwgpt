@@ -31,6 +31,15 @@ CLASS_JSON_PATH = f"{parent_folder}/models/bmw_class_map_b4.json"
 DB_PATH = f"{parent_folder}/models/bmw_knowledge_db_rag_paddleocr"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
+# --- DEBUG CHECK ---
+print(f"📂 Script Location: {current_folder}")
+print(f"📂 Target DB Path: {DB_PATH}")
+
+if not os.path.exists(DB_PATH):
+    st.error(f"❌ CRITICAL ERROR: Database folder not found at: {DB_PATH}")
+    st.info("Please check: Is the folder name exactly 'bmw_knowledge_db_rag_paddleocr'? Is it inside the 'models' folder?")
+    st.stop()
+
 # --- PAGE SETUP & THEME ---
 st.set_page_config(page_title="BMWCHAT", layout="wide", page_icon="docs/static/BMW_favicon.png")
 
