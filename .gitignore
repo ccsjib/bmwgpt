@@ -1,4 +1,3 @@
-ddg_custom_bmw_dataset/
 bmw_rag_data/**
 .streamlit/
 *.zip
