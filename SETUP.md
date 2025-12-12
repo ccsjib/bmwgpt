@@ -1,15 +1,15 @@
 # Setup and Installation
 
-## Option 1: Quick Start (Web Application)
+## Option 1: Web-Hosted App
 
 Simply head to this link: [BMWChat](https://bmwchat.streamlit.app)
 
-## Option 2: Local Installation (Developers)
+## Option 2: Local Installation
 
-If you prefer to run the code locally or want to contribute, follow these steps.
+If you need to run the code locally, follow these steps.
 
 ### Prerequisites
-* Python 3.8 or higher
+* Python 3.9/3.10 (MacOS comes standard with 3.9.6 currently)
 * Git
 
 ### 1. Clone the Repository

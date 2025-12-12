@@ -11,6 +11,10 @@ BMWChat first uses a model trained on a wide array of over 10,000 images includi
 
 The chat can then access the database for that model. Questions from specifications to repair instructions can be asked. It responds with more detail if the BMW is one of the supported models produced from the 1980s to the 2000s, and if not, it can provide more basic specifications through sources like Wikipedia. The chat is connected to Gemini to create more human-like responses and allow additional generalized information when the database lacks sufficient information to answer the question. 
 
+##Notes
+
+*Dataset is stored in the **Releases** section of the repository. 
+
 ## Quick Start
 
 ### Prerequisites

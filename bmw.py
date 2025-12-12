@@ -273,7 +273,7 @@ def generate_answer(car_model, user_question, db, api_key, chassis_override=None
             # STRATEGY A: Hard Filter (Strict Mode)
             docs = db.similarity_search(
                 user_question, 
-                k=4, 
+                k=8, 
                 filter={"car_model": chassis_code}
             )
         
@@ -282,14 +282,14 @@ def generate_answer(car_model, user_question, db, api_key, chassis_override=None
             used_strategy = "General Fallback"
             docs = db.similarity_search(
                 user_question,
-                k=4,
+                k=8,
                 filter={"car_model": "General"}
             )
             
             # If still nothing, do a global search
             if not docs:
                  used_strategy = "Global (Last Resort)"
-                 docs = db.similarity_search(f"{car_model} {user_question}", k=4)
+                 docs = db.similarity_search(f"{car_model} {user_question}", k=8)
 
     except Exception as e:
         return f"⚠️ **Database Error:** {str(e)}", []
