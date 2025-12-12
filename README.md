@@ -36,7 +36,7 @@ For more details, check out [SETUP.md](./SETUP.md)
 
 [Demo video](./videos/BMWChat_Demo.mp4)
 
-[Technical walkthrough](./videos/BMWChat_Tech_Walkthrough.mp4))
+[Technical walkthrough](./videos/BMWChat_Tech_Walkthrough.mp4)
 
 ## Objectives
 
