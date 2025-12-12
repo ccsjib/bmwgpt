@@ -1,9 +1,5 @@
 # BMWChat (BMWGPT)
 
-A BMW-focused automotive AI identification and repair assistant. Identifies BMW models from an image and gives access to a curated database of repair and specification information.
-
-## What Is It?
-
 BMWChat is built for beginner car enthusiasts who want to learn more about BMWs. Although it specifically focuses on most models produced from the 1980s to the 2000s, users can upload a picture of an unknown BMW to identify it and access a database of knowledge about any specific BMW. From basic specifications to repair procedures, BMWChat is capable of answering a vast array of questions.
 
 ## What It Does
