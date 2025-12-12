@@ -13,7 +13,7 @@ The chat can then access the database for that model. Questions from specificati
 
 ## Notes
 
-* Dataset is stored in the **Releases** section of the repository. 
+* [Dataset](https://github.com/ccsjib/bmwgpt/releases/tag/full-dataset) is stored in the **Releases** section of the repository. 
 
 ## Quick Start
 
