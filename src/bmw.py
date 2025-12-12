@@ -27,7 +27,7 @@ DB_PATH = "models/bmw_knowledge_db_rag_paddleocr"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 # --- PAGE SETUP & THEME ---
-st.set_page_config(page_title="BMWCHAT", layout="wide", page_icon="src/static/BMW_favicon.png")
+st.set_page_config(page_title="BMWCHAT", layout="wide", page_icon="docs/static/BMW_favicon.png")
 
 st.markdown("""
     <style>
@@ -94,7 +94,7 @@ img_col, title_col = st.columns([1, 15]) # Adjust the ratio as needed
 
 with img_col:
     # Put the image in the first new column
-    st.image("src/static/BMW_favicon.png", width=100)
+    st.image("docs/static/BMW_favicon.png", width=100)
 
 with title_col:
     # Put the title in the second new column
