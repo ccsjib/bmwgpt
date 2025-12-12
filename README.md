@@ -33,9 +33,10 @@ Once BMWChat is running/open, follow the instructions in the sidebar to get your
 For more details, check out [SETUP.md](./SETUP.md)
 
 ## Video Links
-Demo video here:
 
-Technical walkthrough here: 
+[Demo video](./videos/BMWChat_Demo.mp4)
+
+[Technical walkthrough]
 
 ## Objectives
 
