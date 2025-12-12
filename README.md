@@ -34,6 +34,8 @@ Clone this repository and setup a Python virtual environment where you can downl
 
 Once BMWChat is running/open, follow the instructions in the sidebar to get your Google AI Studio API key from their website. Submit it to BMWChat to have access to the chat. Without this step, the identification model is still functional. 
 
+For more details, check out [SETUP.md](./SETUP.md)
+
 ## Video Links
 Demo video here:
 
